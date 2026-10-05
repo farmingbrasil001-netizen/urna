@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Urna Eletrônica Brasileira - Sistema de Eleição</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome para ícones -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Fonte Google Inter & Digital-7 style -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    /* Estilo do Plástico/Gabinete da Urna */
+    .urna-body {
+      background: linear-gradient(145deg, #e6e8ec, #d0d3d9);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.3), inset 0 2px 4px rgba(255,255,255,0.8);
+      border: 3px solid #b8bcc4;
+    }
+    
+    .urna-screen-frame {
+      background: #1b1e22;
+      box-shadow: inset 0 3px 8px rgba(0,0,0,0.8);
+    }
+
+    /* Tela da Urna estilo LCD */
+    .urna-screen {
+      background: #f4f6f0;
+      color: #111827;
+      font-family: 'Chakra Petch', sans-serif;
+      box-shadow: inset 0 0 10px rgba(0,0,0,0.15);
+    }
+
+    /* Animação do Pisca da Caixa de Número */
+    @keyframes blink {
+      0%, 100% { opacity: 1; border-color: #000; }
+      50% { opacity: 0.3; border-color: #9ca3af; }
+    }
+    .digit-active {
+      animation: blink 1s infinite;
+    }
+
+    /* Botões Teclado Tátil */
+    .key-btn {
+      background: linear-gradient(180deg, #2a2d32 0%, #15171a 100%);
+      color: #ffffff;
+      box-shadow: 0 4px 0 #0a0b0c, 0 5px 10px rgba(0,0,0,0.3);
+      transition: all 0.05s ease;
+      user-select: none;
+    }
+    .key-btn:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 #0a0b0c, 0 2px 5px rgba(0,0,0,0.3);
+    }
+
+    /* Botões de Ação Especiais */
+    .btn-branco {
+      background: linear-gradient(180deg, #ffffff 0%, #e2e8f0 100%);
+      color: #1e293b;
+      box-shadow: 0 4px 0 #cbd5e1, 0 5px 10px rgba(0,0,0,0.2);
+    }
+    .btn-branco:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 #cbd5e1;
+    }
+
+    .btn-corrige {
+      background: linear-gradient(180deg, #f97316 0%, #ea580c 100%);
+      color: #ffffff;
+      box-shadow: 0 4px 0 #c2410c, 0 5px 10px rgba(0,0,0,0.2);
+    }
+    .btn-corrige:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 #c2410c;
+    }
+
+    .btn-confirma {
+      background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%);
+      color: #ffffff;
+      box-shadow: 0 4px 0 #15803d, 0 5px 10px rgba(0,0,0,0.2);
+    }
+    .btn-confirma:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 #15803d;
+    }
+
+    /* Modal / Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f1f1;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #888;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 font-['Inter',sans-serif] text-slate-100 min-h-screen flex flex-col justify-between items-center p-2 sm:p-4">
+
+  <!-- Top Navigation & Header -->
+  <header class="w-full max-w-5xl flex flex-wrap justify-between items-center gap-2 mb-4 bg-slate-800 p-3 sm:p-4 rounded-xl border border-slate-700 shadow-lg">
+    <div class="flex items-center gap-3">
+      <div class="bg-yellow-500 text-slate-900 font-extrabold px-3 py-1.5 rounded-lg text-sm flex items-center gap-2 shadow">
+        <i class="fa-solid me-1 fa-check-double"></i> JUSTIÇA ELEITORAL
+      </div>
+      <h1 class="text-base sm:text-lg font-bold text-slate-200 hidden sm:block">Simulador da Urna Eletrônica</h1>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <!-- Secret Admin Unlock Button -->
+      <button id="versionBadge" onclick="handleVersionClick()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs px-3 py-1.5 rounded-md border border-slate-600 font-mono transition-all">
+        Versão 1.0 <span id="clickCounterText" class="text-xs text-yellow-400 font-bold hidden">(5)</span>
+      </button>
+
+      <button id="adminToggleBtn" onclick="toggleAdminModal()" class="hidden bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-semibold px-3 py-1.5 rounded-md shadow flex items-center gap-2 transition">
+        <i class="fa-solid fa-gear"></i> Painel do Criador
+      </button>
+
+      <button onclick="openLoadCodeModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-semibold px-3 py-1.5 rounded-md shadow flex items-center gap-2 transition">
+        <i class="fa-solid fa-key"></i> Inserir Código
+      </button>
+    </div>
+  </header>
+
+  <!-- Banner de Dica -->
+  <div class="w-full max-w-5xl bg-slate-800/80 border-l-4 border-yellow-500 p-3 mb-4 rounded-r-lg text-xs sm:text-sm text-slate-300 flex justify-between items-center gap-2 shadow">
+    <div>
+      <span class="font-bold text-yellow-400"><i class="fa-solid fa-lightbulb me-1"></i> Dica de Uso:</span> 
+      Você pode votar diretamente na urna abaixo! Para criar sua própria eleição ou gerar um código para amigos, clique <span class="text-yellow-400 underline cursor-pointer" onclick="handleVersionClick()">5 vezes no botão "Versão 1.0"</span> acima para desbloquear o Painel do Criador!
+    </div>
+  </div>
+
+  <main class="w-full max-w-5xl flex-1 flex flex-col justify-center items-center my-2">
+    <!-- Gabinete Principal da Urna -->
+    <div class="urna-body w-full rounded-2xl p-4 sm:p-8 flex flex-col lg:flex-row gap-6 shadow-2xl relative border border-slate-300">
+      
+      <!-- Brasão e Identificação Superior Mobil -->
+      <div class="lg:hidden flex items-center justify-between border-b border-slate-400 pb-2 mb-1">
+        <div class="text-slate-800 font-bold text-xs uppercase tracking-wider flex items-center gap-2">
+          <i class="fa-solid fa-shield-halved text-green-700"></i> Justiça Eleitoral
+        </div>
+        <span class="text-xs font-semibold text-slate-600" id="currentElectionTitleMobile">Eleição Simulada</span>
+      </div>
+
+      <!-- TELA DA URNA (LCD) -->
+      <div class="flex-1 flex flex-col justify-between">
+        <div class="urna-screen-frame p-3 sm:p-4 rounded-xl flex-1 flex flex-col">
+          
+          <div id="urnaScreen" class="urna-screen flex-1 rounded-lg p-4 sm:p-6 flex flex-col justify-between min-h-[340px] sm:min-h-[400px] relative overflow-hidden">
+            
+            <!-- Conteúdo Dinâmico da Tela -->
+            <div id="screenContent" class="flex-1 flex flex-col justify-between">
+              <!-- Renderizado via JS -->
+            </div>
+
+            <!-- Rodapé Fixo da Tela com instruções -->
+            <div id="screenFooter" class="border-t-2 border-slate-800 pt-2 text-[11px] sm:text-xs text-slate-800 font-bold uppercase mt-2 hidden">
+              Aperte a tecla:<br>
+              <span class="text-green-700 font-extrabold me-3">VERDE para CONFIRMAR</span>
+              <span class="text-orange-600 font-extrabold">LARANJA para CORRIGIR</span>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- TECLADO TÁTIL DA URNA -->
+      <div class="w-full lg:w-80 bg-slate-800 p-4 sm:p-6 rounded-xl flex flex-col justify-between gap-4 shadow-inner border border-slate-700">
+        
+        <!-- Brasão / Logo Justiça Eleitoral no Teclado -->
+        <div class="hidden lg:flex items-center justify-center gap-2 border-b border-slate-700 pb-3 text-center">
+          <i class="fa-solid fa-shield-halved text-yellow-500 text-2xl"></i>
+          <div class="text-left">
+            <h2 class="text-xs font-extrabold text-slate-200 uppercase tracking-wider leading-tight">Justiça Eleitoral</h2>
+            <p class="text-[10px] text-slate-400 font-semibold" id="currentElectionTitleDesktop">Eleição Simulada</p>
+          </div>
+        </div>
+
+        <!-- Teclado Numérico (0-9) -->
+        <div class="grid grid-cols-3 gap-3 px-2 sm:px-4">
+          <button onclick="pressKey('1')" class="key-btn h-12 sm:h-14 rounded-lg text-xl sm:text-2xl font-bold flex items-center justify-center">1</button>
+          <button onclick="pressKey('2')" class="key-btn h-12 sm:h-14 rounded-lg text-xl sm:text-2xl font-bold flex items-center justify-center">2</button>
+          <button onclick="pressKey('3')" class="key-btn h-12 sm:h-14 rounded-lg text-xl sm:text-2xl font-bold flex items-center justify-center">3</button>
+          <button onclick="pressKey('4')" class="key-btn h-12 sm:h-14 rounded-lg text-xl sm:text-2xl font-bold flex items-center justify-center">4</button>
+          <button onclick="pressKey('5')" class="key-btn h-12 sm:h-14 rounded-lg text-xl sm:text-2xl font-bold flex items-center justify-center">5</button>
+          <button onclick="pressKey('6')" class="key-btn h-12 sm:h-14 rounded-lg text-xl sm:text-2xl font-bold flex items-center justify-center">6</button>
+          <button onclick="pressKey('7')" class="key-btn h-12 sm:h-14 rounded-lg text-xl sm:text-2xl font-bold flex items-center justify-center">7</button>
+          <button onclick="pressKey('8')" class="key-btn h-12 sm:h-14 rounded-lg text-xl sm:text-2xl font-bold flex items-center justify-center">8</button>
+          <button onclick="pressKey('9')" class="key-btn h-12 sm:h-14 rounded-lg text-xl sm:text-2xl font-bold flex items-center justify-center">9</button>
+          <div></div>
+          <button onclick="pressKey('0')" class="key-btn h-12 sm:h-14 rounded-lg text-xl sm:text-2xl font-bold flex items-center justify-center">0</button>
+          <div></div>
+        </div>
+
+        <!-- Botões Especiais de Ação -->
+        <div class="grid grid-cols-3 gap-2 pt-2">
+          <button onclick="pressBranco()" class="btn-branco h-12 sm:h-14 rounded-md font-bold text-xs sm:text-sm uppercase tracking-wide">Branco</button>
+          <button onclick="pressCorrige()" class="btn-corrige h-12 sm:h-14 rounded-md font-bold text-xs sm:text-sm uppercase tracking-wide">Corrige</button>
+          <button onclick="pressConfirma()" class="btn-confirma h-12 sm:h-14 rounded-md font-bold text-xs sm:text-sm uppercase tracking-wide">Confirma</button>
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+
+  <!-- MODAL PAINEL DO CRIADOR (ADMIN) -->
+  <div id="adminModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-6 hidden">
+    <div class="bg-slate-800 border border-slate-700 w-full max-w-4xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+      
+      <!-- Cabeçalho Modal Admin -->
+      <div class="bg-slate-900 p-4 border-b border-slate-700 flex justify-between items-center">
+        <div class="flex items-center gap-3">
+          <div class="bg-emerald-500/20 text-emerald-400 p-2 rounded-lg">
+            <i class="fa-solid fa-sliders text-xl"></i>
+          </div>
+          <div>
+            <h2 class="text-lg font-bold text-white">Painel do Criador de Eleição</h2>
+            <p class="text-xs text-slate-400">Gerencie candidatos, visualize a apuração dos votos e crie seu código de compartilhamento.</p>
+          </div>
+        </div>
+        <button onclick="toggleAdminModal()" class="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition">
+          <i class="fa-solid fa-xmark text-xl"></i>
+        </button>
+      </div>
+
+      <!-- Abas de Navegação Admin -->
+      <div class="flex border-b border-slate-700 bg-slate-800/50 px-4">
+        <button id="tabCandidatesBtn" onclick="switchAdminTab('candidates')" class="py-3 px-4 font-semibold text-sm border-b-2 border-emerald-500 text-emerald-400 flex items-center gap-2">
+          <i class="fa-solid fa-users"></i> Candidatos
+        </button>
+        <button id="tabResultsBtn" onclick="switchAdminTab('results')" class="py-3 px-4 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2">
+          <i class="fa-solid fa-chart-column"></i> Resultado & Apuração
+        </button>
+        <button id="tabShareBtn" onclick="switchAdminTab('share')" class="py-3 px-4 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2">
+          <i class="fa-solid fa-share-nodes"></i> Código de Compartilhamento
+        </button>
+      </div>
+
+      <!-- Conteúdo do Modal Admin -->
+      <div class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+
+        <!-- ABA 1: CANDIDATOS -->
+        <div id="tabCandidates" class="space-y-6">
+          
+          <!-- Configurações Gerais -->
+          <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/60 space-y-3">
+            <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider">Configurações Básicas</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Título da Eleição</label>
+                <input type="text" id="adminElectionTitle" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500" placeholder="Ex: Eleição do Grêmio Estudantil 2026">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Cargo Político</label>
+                <input type="text" id="adminRoleName" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500" placeholder="Ex: PRESIDENTE">
+              </div>
+            </div>
+          </div>
+
+          <!-- Formulário Adicionar Candidato -->
+          <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/60 space-y-3">
+            <h3 class="text-sm font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+              <i class="fa-solid fa-user-plus"></i> Adicionar Candidato
+            </h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Número (ex: 11, 22, 123)</label>
+                <input type="number" id="candNumber" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500" placeholder="Ex: 77">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Nome Completo</label>
+                <input type="text" id="candName" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500" placeholder="Ex: João da Silva">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">Partido / Sigla</label>
+                <input type="text" id="candParty" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500" placeholder="Ex: PDEV">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-400 mb-1">URL da Foto / Avatar</label>
+                <input type="text" id="candPhoto" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500" placeholder="Opcional (URL de imagem)">
+              </div>
+            </div>
+            <button onclick="addCandidate()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 rounded-lg transition text-sm flex items-center justify-center gap-2">
+              <i class="fa-solid fa-plus"></i> Salvar Candidato
+            </button>
+          </div>
+
+          <!-- Lista de Candidatos Cadastrados -->
+          <div>
+            <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider mb-3">Candidatos Cadastrados</h3>
+            <div id="candidatesList" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <!-- Renderizado via JS -->
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ABA 2: RESULTADOS -->
+        <div id="tabResults" class="hidden space-y-4">
+          <div class="flex justify-between items-center bg-slate-900/60 p-4 rounded-xl border border-slate-700/60">
+            <div>
+              <span class="text-xs text-slate-400 uppercase font-semibold">Total de Votos Computados</span>
+              <div class="text-2xl font-extrabold text-white" id="totalVotesCount">0</div>
+            </div>
+            <button onclick="resetVotes()" class="bg-rose-600/20 text-rose-400 hover:bg-rose-600/30 border border-rose-500/30 text-xs px-3 py-2 rounded-lg font-semibold transition flex items-center gap-2">
+              <i class="fa-solid fa-rotate-right"></i> Zerar Votação (Zeresima)
+            </button>
+          </div>
+
+          <!-- Gráfico de Resultados -->
+          <div id="resultsList" class="space-y-3">
+            <!-- Renderizado via JS -->
+          </div>
+        </div>
+
+        <!-- ABA 3: COMPARTILHAR CÓDIGO -->
+        <div id="tabShare" class="hidden space-y-4">
+          <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/60 space-y-3">
+            <h3 class="text-sm font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+              <i class="fa-solid fa-code"></i> Código da Eleição Gerado
+            </h3>
+            <p class="text-xs text-slate-300">
+              Copie o código abaixo e envie para quem você quiser! Quando a pessoa colar o código na opção "Inserir Código", a Urna dela carregará exatamente esta mesma eleição com seus candidatos.
+            </p>
+            
+            <div class="relative">
+              <textarea id="electionCodeOutput" readonly class="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-xs font-mono text-emerald-400 h-28 focus:outline-none break-all resize-none"></textarea>
+              <button onclick="copyElectionCode()" class="absolute top-2 right-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3 py-1.5 rounded shadow font-semibold transition">
+                <i class="fa-solid fa-copy me-1"></i> Copiar
+              </button>
+            </div>
+            <p id="copySuccessMsg" class="text-xs text-emerald-400 font-semibold hidden"><i class="fa-solid fa-check me-1"></i> Código copiado com sucesso!</p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Rodapé Modal Admin -->
+      <div class="bg-slate-900 p-4 border-t border-slate-700 flex justify-end gap-3">
+        <button onclick="saveAdminSettings()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm px-6 py-2 rounded-lg shadow transition">
+          Salvar e Fechar
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL CARREGAR CÓDIGO -->
+  <div id="loadCodeModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-800 border border-slate-700 w-full max-w-lg rounded-2xl shadow-2xl p-6 space-y-4">
+      <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-download text-indigo-400"></i> Importar Eleição por Código
+        </h3>
+        <button onclick="closeLoadCodeModal()" class="text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark text-xl"></i>
+        </button>
+      </div>
+
+      <p class="text-xs text-slate-300">
+        Cole aqui o código de eleição que você recebeu do seu amigo para carregar os candidatos e cargos personalizados:
+      </p>
+
+      <textarea id="inputElectionCode" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-xs font-mono text-indigo-300 h-28 focus:outline-none focus:border-indigo-500 resize-none" placeholder="Cole o código gigantesco de eleição aqui..."></textarea>
+
+      <div class="flex justify-end gap-3">
+        <button onclick="closeLoadCodeModal()" class="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white">
+          Cancelar
+        </button>
+        <button onclick="importElectionCode()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-5 py-2 rounded-lg shadow transition flex items-center gap-2">
+          <i class="fa-solid fa-check"></i> Carregar Eleição
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="text-center text-xs text-slate-500 my-2">
+    Simulador Educativo de Eleições • Desenvolvido com HTML5, Tailwind CSS e Web Audio API.
+  </footer>
+
+  <script>
+    /* ========================================================================
+       SINTETIZADOR DE ÁUDIO (Web Audio API - Sem arquivos externos!)
+       ======================================================================== */
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new AudioCtx();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    // Som de beep de tecla normal
+    function playKeySound() {
+      try {
+        initAudio();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1200, audioCtx.currentTime); // Hz
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.08);
+      } catch (e) {
+        console.log('Audio error:', e);
+      }
+    }
+
+    // Som de Confirmação Final ("PILILA" / TUUU característico da Urna)
+    function playUrnaFimSound() {
+      try {
+        initAudio();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        
+        osc.type = 'sine';
+        // Tom característico da Urna Eletrônica (~400Hz prolongado)
+        osc.frequency.setValueAtTime(425, audioCtx.currentTime);
+        
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime + 1.1);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.25);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start();
+        osc.stop(audioCtx.currentTime + 1.25);
+      } catch (e) {
+        console.log('Audio error:', e);
+      }
+    }
+
+    /* ========================================================================
+       ESTADO DA ELEIÇÃO & LOCALSTORAGE
+       ======================================================================== */
+    const DEFAULT_ELECTION = {
+      title: "Eleição Geral Simulada",
+      role: "PRESIDENTE",
+      digitCount: 2, // Quantos dígitos tem o número do candidato
+      candidates: [
+        {
+          number: "11",
+          name: "Lucas Dev Silva",
+          party: "PCOD - Partido dos Programadores",
+          photo: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80"
+        },
+        {
+          number: "22",
+          name: "Mariana Costa",
+          party: "PLOG - Partido da Lógica",
+          photo: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200&auto=format&fit=crop&q=80"
+        },
+        {
+          number: "13",
+          name: "Carlos Eduardo",
+          party: "PTCH - Partido Tech",
+          photo: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80"
+        }
+      ],
+      votes: {
+        "11": 0,
+        "22": 0,
+        "13": 0,
+        "BRANCO": 0,
+        "NULO": 0
+      }
+    };
+
+    let electionData = JSON.parse(localStorage.getItem('urna_election_data')) || DEFAULT_ELECTION;
+
+    function saveElectionData() {
+      localStorage.setItem('urna_election_data', JSON.stringify(electionData));
+      updateElectionTitles();
+    }
+
+    function updateElectionTitles() {
+      document.getElementById('currentElectionTitleMobile').innerText = electionData.title;
+      document.getElementById('currentElectionTitleDesktop').innerText = electionData.title;
+    }
+
+    /* ========================================================================
+       MÁQUINA DE ESTADOS DA URNA ELETRÔNICA
+       ======================================================================== */
+    let typedNumber = "";
+    let isBranco = false;
+    let isFim = false;
+
+    // Inicialização da Tela
+    function renderScreen() {
+      const container = document.getElementById('screenContent');
+      const footer = document.getElementById('screenFooter');
+
+      if (isFim) {
+        footer.classList.add('hidden');
+        container.innerHTML = `
+          <div class="flex-1 flex flex-col justify-center items-center text-center py-8 animate-pulse">
+            <h1 class="text-6xl sm:text-8xl font-black text-slate-900 tracking-widest">F I M</h1>
+            <p class="text-sm sm:text-base font-bold text-slate-600 mt-4 uppercase tracking-wider">Voto Gravado com Sucesso</p>
+          </div>
+        `;
+        return;
+      }
+
+      footer.classList.remove('hidden');
+
+      if (isBranco) {
+        container.innerHTML = `
+          <div class="flex-1 flex flex-col justify-between">
+            <div class="text-xs sm:text-sm font-bold text-slate-600 uppercase">Seu voto para</div>
+            <div class="text-xl sm:text-2xl font-black text-slate-900 tracking-wider my-2">${electionData.role}</div>
+            <div class="flex-1 flex justify-center items-center">
+              <div class="text-2xl sm:text-3xl font-black text-slate-800 tracking-widest border-2 border-slate-800 px-6 py-2 animate-pulse">
+                VOTO EM BRANCO
+              </div>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      // Procurar candidato pelo número digitado
+      const candidate = electionData.candidates.find(c => c.number === typedNumber);
+      const isComplete = typedNumber.length >= electionData.digitCount;
+      const isNulo = isComplete && !candidate;
+
+      // Renderização das caixinhas de números
+      let digitsHTML = '';
+      for (let i = 0; i < electionData.digitCount; i++) {
+        const char = typedNumber[i] || '';
+        const isActive = (i === typedNumber.length);
+        digitsHTML += `
+          <div class="w-8 h-10 sm:w-10 sm:h-12 border-2 border-slate-900 flex items-center justify-center text-xl sm:text-2xl font-bold ${isActive ? 'digit-active' : ''}">
+            ${char}
+          </div>
+        `;
+      }
+
+      if (!isComplete && typedNumber.length < electionData.digitCount) {
+        container.innerHTML = `
+          <div class="flex-1 flex flex-col justify-between">
+            <div>
+              <div class="text-xs sm:text-sm font-bold text-slate-600 uppercase">Seu voto para</div>
+              <div class="text-lg sm:text-xl font-black text-slate-900 mt-1">${electionData.role}</div>
+              <div class="flex items-center gap-2 mt-4">
+                <span class="text-xs sm:text-sm font-bold text-slate-700">Número:</span>
+                <div class="flex gap-1.5">${digitsHTML}</div>
+              </div>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      // Se é voto NULO
+      if (isNulo) {
+        container.innerHTML = `
+          <div class="flex-1 flex flex-col justify-between">
+            <div>
+              <div class="text-xs sm:text-sm font-bold text-slate-600 uppercase">Seu voto para</div>
+              <div class="text-lg sm:text-xl font-black text-slate-900 mt-1">${electionData.role}</div>
+              <div class="flex items-center gap-2 mt-3">
+                <span class="text-xs sm:text-sm font-bold text-slate-700">Número:</span>
+                <div class="flex gap-1.5">${digitsHTML}</div>
+              </div>
+            </div>
+            <div class="my-2">
+              <div class="text-xl sm:text-2xl font-black text-rose-700 tracking-wider">NÚMERO ERRADO</div>
+              <div class="text-lg font-bold text-slate-800 mt-1">VOTO NULO</div>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      // Se encontrou candidato válido
+      container.innerHTML = `
+        <div class="flex-1 flex flex-col justify-between">
+          <div class="flex justify-between items-start gap-2">
+            <!-- Dados do Candidato -->
+            <div class="space-y-1 sm:space-y-2">
+              <div class="text-xs sm:text-sm font-bold text-slate-600 uppercase">Seu voto para</div>
+              <div class="text-base sm:text-lg font-black text-slate-900">${electionData.role}</div>
+              
+              <div class="flex items-center gap-2 pt-1">
+                <span class="text-xs sm:text-sm font-bold text-slate-700">Número:</span>
+                <div class="flex gap-1.5">${digitsHTML}</div>
+              </div>
+
+              <div class="pt-2">
+                <div class="text-[11px] font-semibold text-slate-500 uppercase">Nome</div>
+                <div class="text-sm sm:text-base font-extrabold text-slate-900 leading-tight">${candidate.name}</div>
+              </div>
+
+              <div>
+                <div class="text-[11px] font-semibold text-slate-500 uppercase">Partido</div>
+                <div class="text-xs sm:text-sm font-bold text-slate-800">${candidate.party}</div>
+              </div>
+            </div>
+
+            <!-- Foto do Candidato -->
+            <div class="w-24 h-32 sm:w-28 sm:h-36 bg-slate-300 border-2 border-slate-900 rounded overflow-hidden flex-shrink-0 flex items-center justify-center shadow">
+              ${candidate.photo ? 
+                `<img src="${candidate.photo}" alt="${candidate.name}" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='https://placehold.co/150x200/222/FFF?text=Foto';">` : 
+                `<i class="fa-solid fa-user text-4xl text-slate-500"></i>`
+              }
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    /* ========================================================================
+       AÇÕES DO TECLADO
+       ======================================================================== */
+    function pressKey(num) {
+      if (isFim || isBranco) return;
+
+      if (typedNumber.length < electionData.digitCount) {
+        playKeySound();
+        typedNumber += num;
+        renderScreen();
+      }
+    }
+
+    function pressBranco() {
+      if (isFim) return;
+      playKeySound();
+      typedNumber = "";
+      isBranco = true;
+      renderScreen();
+    }
+
+    function pressCorrige() {
+      if (isFim) return;
+      playKeySound();
+      typedNumber = "";
+      isBranco = false;
+      renderScreen();
+    }
+
+    function pressConfirma() {
+      if (isFim) return;
+
+      const isComplete = typedNumber.length >= electionData.digitCount;
+      if (!isBranco && !isComplete) {
+        // Voto incompleto, não confirma
+        return;
+      }
+
+      // Computar voto
+      if (isBranco) {
+        electionData.votes["BRANCO"] = (electionData.votes["BRANCO"] || 0) + 1;
+      } else {
+        const candidate = electionData.candidates.find(c => c.number === typedNumber);
+        if (candidate) {
+          electionData.votes[typedNumber] = (electionData.votes[typedNumber] || 0) + 1;
+        } else {
+          electionData.votes["NULO"] = (electionData.votes["NULO"] || 0) + 1;
+        }
+      }
+
+      saveElectionData();
+      playUrnaFimSound();
+
+      // Exibir FIM
+      isFim = true;
+      renderScreen();
+
+      // Resetar Urna após 3 segundos
+      setTimeout(() => {
+        isFim = false;
+        isBranco = false;
+        typedNumber = "";
+        renderScreen();
+      }, 3000);
+    }
+
+    /* ========================================================================
+       SISTEMA REVELAR ADMIN (5 CLIQUES EM VERSÃO 1.0)
+       ======================================================================== */
+    let versionClickCount = 0;
+    let versionClickTimer = null;
+
+    function handleVersionClick() {
+      versionClickCount++;
+      const counterText = document.getElementById('clickCounterText');
+      counterText.classList.remove('hidden');
+      counterText.innerText = `(${5 - versionClickCount})`;
+
+      clearTimeout(versionClickTimer);
+      versionClickTimer = setTimeout(() => {
+        versionClickCount = 0;
+        counterText.classList.add('hidden');
+      }, 3000);
+
+      if (versionClickCount >= 5) {
+        versionClickCount = 0;
+        counterText.classList.add('hidden');
+        document.getElementById('adminToggleBtn').classList.remove('hidden');
+        toggleAdminModal();
+      }
+    }
+
+    /* ========================================================================
+       GERENCIAMENTO PAINEL DO CRIADOR (ADMIN)
+       ======================================================================== */
+    function toggleAdminModal() {
+      const modal = document.getElementById('adminModal');
+      modal.classList.toggle('hidden');
+      if (!modal.classList.contains('hidden')) {
+        populateAdminFields();
+      }
+    }
+
+    function switchAdminTab(tabName) {
+      document.getElementById('tabCandidates').classList.add('hidden');
+      document.getElementById('tabResults').classList.add('hidden');
+      document.getElementById('tabShare').classList.add('hidden');
+
+      document.getElementById('tabCandidatesBtn').className = "py-3 px-4 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2";
+      document.getElementById('tabResultsBtn').className = "py-3 px-4 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2";
+      document.getElementById('tabShareBtn').className = "py-3 px-4 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2";
+
+      if (tabName === 'candidates') {
+        document.getElementById('tabCandidates').classList.remove('hidden');
+        document.getElementById('tabCandidatesBtn').className = "py-3 px-4 font-semibold text-sm border-b-2 border-emerald-500 text-emerald-400 flex items-center gap-2";
+      } else if (tabName === 'results') {
+        document.getElementById('tabResults').classList.remove('hidden');
+        document.getElementById('tabResultsBtn').className = "py-3 px-4 font-semibold text-sm border-b-2 border-emerald-500 text-emerald-400 flex items-center gap-2";
+        renderResults();
+      } else if (tabName === 'share') {
+        document.getElementById('tabShare').classList.remove('hidden');
+        document.getElementById('tabShareBtn').className = "py-3 px-4 font-semibold text-sm border-b-2 border-emerald-500 text-emerald-400 flex items-center gap-2";
+        generateElectionCode();
+      }
+    }
+
+    function populateAdminFields() {
+      document.getElementById('adminElectionTitle').value = electionData.title;
+      document.getElementById('adminRoleName').value = electionData.role;
+      renderAdminCandidatesList();
+    }
+
+    function renderAdminCandidatesList() {
+      const listContainer = document.getElementById('candidatesList');
+      if (electionData.candidates.length === 0) {
+        listContainer.innerHTML = `<div class="col-span-2 text-center text-xs text-slate-500 py-4">Nenhum candidato cadastrado.</div>`;
+        return;
+      }
+
+      listContainer.innerHTML = electionData.candidates.map((c, index) => `
+        <div class="bg-slate-900 p-3 rounded-lg border border-slate-700 flex justify-between items-center gap-3">
+          <div class="flex items-center gap-3 overflow-hidden">
+            <div class="w-10 h-10 bg-slate-800 rounded border border-slate-700 flex items-center justify-center text-emerald-400 font-bold text-lg flex-shrink-0">
+              ${c.number}
+            </div>
+            <div class="truncate">
+              <h4 class="text-sm font-bold text-white truncate">${c.name}</h4>
+              <p class="text-xs text-slate-400 truncate">${c.party}</p>
+            </div>
+          </div>
+          <button onclick="removeCandidate(${index})" class="text-slate-500 hover:text-rose-400 p-2 transition flex-shrink-0">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </div>
+      `).join('');
+    }
+
+    function addCandidate() {
+      const num = document.getElementById('candNumber').value.trim();
+      const name = document.getElementById('candName').value.trim();
+      const party = document.getElementById('candParty').value.trim();
+      const photo = document.getElementById('candPhoto').value.trim();
+
+      if (!num || !name || !party) {
+        alert('Por favor, preencha o número, nome e partido do candidato!');
+        return;
+      }
+
+      // Atualizar max dígitos
+      if (num.length > electionData.digitCount) {
+        electionData.digitCount = num.length;
+      }
+
+      electionData.candidates.push({ number: num, name, party, photo });
+      if (!electionData.votes[num]) {
+        electionData.votes[num] = 0;
+      }
+
+      // Limpar campos
+      document.getElementById('candNumber').value = '';
+      document.getElementById('candName').value = '';
+      document.getElementById('candParty').value = '';
+      document.getElementById('candPhoto').value = '';
+
+      saveElectionData();
+      renderAdminCandidatesList();
+      renderScreen();
+    }
+
+    function removeCandidate(index) {
+      const removed = electionData.candidates.splice(index, 1)[0];
+      if (removed) {
+        delete electionData.votes[removed.number];
+      }
+      saveElectionData();
+      renderAdminCandidatesList();
+      renderScreen();
+    }
+
+    function saveAdminSettings() {
+      const title = document.getElementById('adminElectionTitle').value.trim();
+      const role = document.getElementById('adminRoleName').value.trim();
+
+      if (title) electionData.title = title;
+      if (role) electionData.role = role.toUpperCase();
+
+      saveElectionData();
+      renderScreen();
+      toggleAdminModal();
+    }
+
+    /* ========================================================================
+       APURAÇÃO DOS RESULTADOS
+       ======================================================================== */
+    function renderResults() {
+      const totalVotes = Object.values(electionData.votes).reduce((a, b) => a + b, 0);
+      document.getElementById('totalVotesCount').innerText = totalVotes;
+
+      const container = document.getElementById('resultsList');
+      let items = [];
+
+      // Candidatos
+      electionData.candidates.forEach(c => {
+        const v = electionData.votes[c.number] || 0;
+        const pct = totalVotes > 0 ? ((v / totalVotes) * 100).toFixed(1) : '0.0';
+        items.push({
+          name: c.name,
+          sub: `Nº ${c.number} - ${c.party}`,
+          votes: v,
+          pct: parseFloat(pct),
+          isCandidate: true
+        });
+      });
+
+      // Brancos e Nulos
+      const vBranco = electionData.votes["BRANCO"] || 0;
+      const pctBranco = totalVotes > 0 ? ((vBranco / totalVotes) * 100).toFixed(1) : '0.0';
+      items.push({ name: "Votos em Branco", sub: "Voto de Legenda/Branco", votes: vBranco, pct: parseFloat(pctBranco), isCandidate: false });
+
+      const vNulo = electionData.votes["NULO"] || 0;
+      const pctNulo = totalVotes > 0 ? ((vNulo / totalVotes) * 100).toFixed(1) : '0.0';
+      items.push({ name: "Votos Nulos", sub: "Voto Nulo/Inválido", votes: vNulo, pct: parseFloat(pctNulo), isCandidate: false });
+
+      // Ordenar por número de votos
+      items.sort((a, b) => b.votes - a.votes);
+
+      container.innerHTML = items.map((item, idx) => `
+        <div class="bg-slate-900 p-4 rounded-xl border border-slate-700/60 space-y-2">
+          <div class="flex justify-between items-center text-sm">
+            <div class="flex items-center gap-2">
+              <span class="font-bold ${idx === 0 && item.votes > 0 ? 'text-yellow-400' : 'text-slate-300'}">${item.name}</span>
+              ${idx === 0 && item.votes > 0 ? '<span class="bg-yellow-500/20 text-yellow-400 text-[10px] font-extrabold px-2 py-0.5 rounded uppercase">Líder</span>' : ''}
+            </div>
+            <div class="text-right">
+              <span class="font-extrabold text-white">${item.votes} votos</span>
+              <span class="text-xs text-slate-400 ml-1">(${item.pct}%)</span>
+            </div>
+          </div>
+          <p class="text-xs text-slate-500">${item.sub}</p>
+          <div class="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
+            <div class="bg-emerald-500 h-full rounded-full transition-all duration-500" style="width: ${item.pct}%"></div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function resetVotes() {
+      if (confirm("Tem certeza que deseja zerar todos os votos computados (ZERÉSIMA)?")) {
+        Object.keys(electionData.votes).forEach(k => {
+          electionData.votes[k] = 0;
+        });
+        saveElectionData();
+        renderResults();
+      }
+    }
+
+    /* ========================================================================
+       GERADOR E IMPORTADOR DE CÓDIGO DE ELEIÇÃO
+       ======================================================================== */
+    function generateElectionCode() {
+      const payload = {
+        title: electionData.title,
+        role: electionData.role,
+        digitCount: electionData.digitCount,
+        candidates: electionData.candidates
+      };
+      // Converter para string JSON e Base64 seguro
+      const jsonStr = JSON.stringify(payload);
+      const b64 = btoa(unescape(encodeURIComponent(jsonStr)));
+      document.getElementById('electionCodeOutput').value = b64;
+    }
+
+    function copyElectionCode() {
+      const copyText = document.getElementById('electionCodeOutput');
+      copyText.select();
+      document.execCommand('copy');
+      
+      const msg = document.getElementById('copySuccessMsg');
+      msg.classList.remove('hidden');
+      setTimeout(() => msg.classList.add('hidden'), 3000);
+    }
+
+    function openLoadCodeModal() {
+      document.getElementById('loadCodeModal').classList.remove('hidden');
+    }
+
+    function closeLoadCodeModal() {
+      document.getElementById('loadCodeModal').classList.add('hidden');
+    }
+
+    function importElectionCode() {
+      const code = document.getElementById('inputElectionCode').value.trim();
+      if (!code) {
+        alert('Por favor, cole um código válido!');
+        return;
+      }
+
+      try {
+        const jsonStr = decodeURIComponent(escape(atob(code)));
+        const parsed = JSON.parse(jsonStr);
+
+        if (!parsed.title || !parsed.candidates) {
+          throw new Error('Formato de código inválido.');
+        }
+
+        electionData.title = parsed.title;
+        electionData.role = parsed.role || "PRESIDENTE";
+        electionData.digitCount = parsed.digitCount || 2;
+        electionData.candidates = parsed.candidates;
+        
+        // Reiniciar contagem de votos para nova eleição importada
+        electionData.votes = { "BRANCO": 0, "NULO": 0 };
+        electionData.candidates.forEach(c => {
+          electionData.votes[c.number] = 0;
+        });
+
+        saveElectionData();
+        renderScreen();
+        closeLoadCodeModal();
+        alert('Eleição importada e carregada com sucesso na Urna!');
+      } catch (err) {
+        alert('Código de eleição inválido ou corrompido. Verifique o texto colado!');
+      }
+    }
+
+    /* ========================================================================
+       INICIALIZAÇÃO DA APLICAÇÃO
+       ======================================================================== */
+    window.onload = function() {
+      updateElectionTitles();
+      renderScreen();
+    };
+  </script>
+</body>
+</html>
